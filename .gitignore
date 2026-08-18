@@ -1,3 +1,4 @@
 .env
 .DS_Store
+.recovery
 node_modules/
