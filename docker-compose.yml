@@ -13,6 +13,9 @@ services:
       - DB_TYPE=sqlite
       - DB_SQLITE_PATH=/home/node/.n8n/database.sqlite
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - N8N_PROXY_HOPS=1 # Hace falta si hay un proxy por delante
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
@@ -24,7 +27,8 @@ services:
       - "traefik.http.routers.mkit-workflow.entrypoints=websecure"
       - "traefik.http.routers.mkit-workflow.tls=true"
       - "traefik.http.routers.mkit-workflow.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.mkit-workflow=mkit-workflow"
+      #- "traefik.http.routers.mkit-workflow=mkit-workflow"
+      - "traefik.http.routers.mkit-workflow.service=mkit-workflow"
       - "traefik.http.services.mkit-workflow.loadbalancer.server.port=${PORT}"
 
 volumes:
