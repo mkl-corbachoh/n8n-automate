@@ -16,6 +16,7 @@ services:
       - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
       - WEBHOOK_URL=${WEBHOOK_URL}
       - N8N_PROXY_HOPS=1 # Hace falta si hay un proxy por delante
+      - TZ=Europe/Madrid # Ajustable según tu zona horaria
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
