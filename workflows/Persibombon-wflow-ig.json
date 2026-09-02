@@ -1,0 +1,2025 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                3
+              ],
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -656,
+        -208
+      ],
+      "id": "ad5a72e4-80f1-4d24-af3f-63df471661ad",
+      "name": "Semanal"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1bIolCRReprOL8qu2moOaZCeDGxCjftDq",
+            "mode": "list",
+            "cachedResultName": "images",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1bIolCRReprOL8qu2moOaZCeDGxCjftDq"
+          }
+        },
+        "options": {
+          "fields": [
+            "mimeType",
+            "name",
+            "id",
+            "webViewLink",
+            "thumbnailLink"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -352,
+        -208
+      ],
+      "id": "5915726b-4244-4037-8eb4-b1fd001a827e",
+      "name": "buscar fotos",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u464uGFlhEWLQSzI",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -192,
+        -336
+      ],
+      "id": "4ac8269c-23c6-4065-811a-6e8881a2caa2",
+      "name": "Descargar",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u464uGFlhEWLQSzI",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "information"
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -432
+      ],
+      "id": "928f3255-07d3-446c-aac4-4b957fa151b4",
+      "name": "INFO fotos"
+    },
+    {
+      "parameters": {
+        "jsCode": "const images = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n\n  if (!item.binary?.data) {\n    continue;\n  }\n\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n\n  const mimeType = item.binary.data.mimeType || 'image/jpeg';\n  const base64 = buffer.toString('base64');\n\n  images.push({\n    type: 'image_url',\n    image_url: {\n      url: `data:${mimeType};base64,${base64}`\n    }\n  });\n}\n\nif (images.length === 0) {\n  throw new Error('No se encontraron imágenes para enviar a OpenRouter');\n}\n\nreturn [\n  {\n    json: {\n      imageCount: images.length,\n      images\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -432
+      ],
+      "id": "8374aef6-ee7e-4b97-b5d5-9279150abd30",
+      "name": "Prepara data foto"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "=-1003709213123",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        -608
+      ],
+      "id": "98641fa9-bc21-4b6a-819b-42aa0e87c556",
+      "name": "Envia fotos",
+      "webhookId": "b948e569-7641-4359-ac4d-7eeda22a5ef5",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: \"openai/gpt-4o-mini\",\n  messages: [\n    {\n      role: \"system\",\n      content: \"Eres el asistente de contenido de Persibonbom. Persi es un perro de agua de 1 año y medio, algo miedoso. Escribe captions naturales, simpáticos y cercanos para Instagram. Analiza el conjunto completo de imágenes como un carrusel. No inventes situaciones que no puedan deducirse razonablemente de las fotografías.\"\n    },\n    {\n      role: \"user\",\n      content: [\n        {\n          type: \"text\",\n          text: `Estas ${$json.imageCount} imágenes forman un único carrusel de Instagram. Analízalas en conjunto y escribe un único caption breve y natural para la publicación. Busca algún hilo común entre las fotos si existe. Puedes usar entre 1 y 3 emojis. No uses hashtags todavía.`\n        },\n        ...$json.images\n      ]\n    }\n  ],\n  temperature: 0.8\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        432,
+        -432
+      ],
+      "id": "2c87a802-4945-4f0b-95ec-baf1eb4bb496",
+      "name": "IA pra Pubish",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8kJ2dEgdR13Rf9Y",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2a0bb14e-d371-4aea-9e48-8d7d388b0d65",
+              "name": "caption",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        560,
+        -432
+      ],
+      "id": "cce96de1-0300-40d6-9ff0-2a59a13be813",
+      "name": "Obtiene publish"
+    },
+    {
+      "parameters": {
+        "chatId": "-1003709213123",
+        "text": "=🐶 Nueva propuesta para Persibonbom  \n{{ $json.caption }}  \n¿Qué hacemos?",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Aprobar",
+                    "additionalFields": {
+                      "callback_data": "approve"
+                    }
+                  },
+                  {
+                    "text": "✍️ Escribir texto",
+                    "additionalFields": {
+                      "callback_data": "manual_caption"
+                    }
+                  },
+                  {
+                    "text": "❌ Descartar",
+                    "additionalFields": {
+                      "callback_data": "discard"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        -240
+      ],
+      "id": "d5e4bc4d-abb2-4d75-aaa0-b952032a1e43",
+      "name": "Envia porpuesta",
+      "webhookId": "a9819fdd-ab6e-4622-9e43-c79574341dc8",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "c6e7bb7f-1ee8-46ca-be17-5ab785f1b7d0"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6666c1fa-b454-4069-945d-0020b88418f9",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "discard",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5ade1186-a29f-459f-9168-65da97e18383",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "manual_caption",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        192
+      ],
+      "id": "5c2bef4c-bdde-4451-9e4b-48f5e0a0ac4b",
+      "name": "Aceptada"
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $json.callback_query.message.chat.id }}",
+        "messageId": "={{ $json.callback_query.message.message_id }}",
+        "text": "={{ $json.callback_query.message.text + '\\n\\n Requerida manual por ' + $json.callback_query.from.first_name }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        368
+      ],
+      "id": "46721158-31d8-4c8a-8373-a63db8bbbec1",
+      "name": "Manual",
+      "webhookId": "7944e881-4b88-4d35-a515-381202aec61b",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $json.callback_query.message.chat.id }}",
+        "messageId": "={{ $json.callback_query.message.message_id }}",
+        "text": "={{ '✅ Propuesta aprobada por ' + $json.callback_query.from.first_name }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        48
+      ],
+      "id": "9a1fb6c5-1d00-42a7-af20-238762db3ac5",
+      "name": "Aceptar",
+      "webhookId": "7944e881-4b88-4d35-a515-381202aec61b",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $json.callback_query.message.chat.id }}",
+        "messageId": "={{ $json.callback_query.message.message_id }}",
+        "text": "={{ '❌ Propuesta descartada por ' + $json.callback_query.from.first_name }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        208
+      ],
+      "id": "2a59f849-e707-4df9-b25d-2629f7c4c154",
+      "name": "Rechazar",
+      "webhookId": "7944e881-4b88-4d35-a515-381202aec61b",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "ZJRW8Dhw5zuRXRjp",
+          "mode": "list",
+          "cachedResultName": "persibonbom_pending_actions",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/ZJRW8Dhw5zuRXRjp"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('Trigger').item.json.callback_query.message.chat.id }}",
+            "status": "=waiting_manual_caption",
+            "requested_by": "={{ $('Trigger').item.json.callback_query.from.id }}",
+            "proposal_message_id": "={{ $('Trigger').item.json.callback_query.message.message_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "proposal_message_id",
+              "displayName": "proposal_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "column": [
+            {
+              "name": "chat_id"
+            },
+            {
+              "name": "proposal_message_id"
+            },
+            {
+              "name": "status"
+            },
+            {
+              "name": "requested_by"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        384
+      ],
+      "id": "ca9f9759-c1a6-40ef-90b2-1a2517260ffb",
+      "name": "En espera"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Manual').item.json.result.chat.id }}",
+        "text": "✍️ Escribe ahora el caption definitivo. El próximo mensaje de texto del grupo se usará como nuevo caption.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        704,
+        384
+      ],
+      "id": "2f4c8e9e-54a7-4f66-bc6a-8f56005061b6",
+      "name": "publish manual",
+      "webhookId": "a9819fdd-ab6e-4622-9e43-c79574341dc8",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ZJRW8Dhw5zuRXRjp",
+          "mode": "list",
+          "cachedResultName": "persibonbom_pending_actions",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/ZJRW8Dhw5zuRXRjp"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "keyValue": "={{ $json.message.chat.id }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "waiting_manual_caption"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -496,
+        544
+      ],
+      "id": "74246742-25bd-4e1e-a5d5-9c006efb6111",
+      "name": "Esta en espera?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "395d6d7f-d695-4097-8864-787cf8b79f0e",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        256,
+        368
+      ],
+      "id": "dd9582bc-562d-4bac-85ab-18e8f71db992",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{  '🐶 Nueva propuesta para Persibonbom:\\n\\n' +  $('Trigger').item.json.message.text+ '\\n\\n¿Qué hacemos?' }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Aprobar",
+                    "additionalFields": {
+                      "callback_data": "approve"
+                    }
+                  },
+                  {
+                    "text": "✍️ Escribir texto",
+                    "additionalFields": {
+                      "callback_data": "manual_caption"
+                    }
+                  },
+                  {
+                    "text": "❌ Descartar",
+                    "additionalFields": {
+                      "callback_data": "discard"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -336,
+        544
+      ],
+      "id": "d5b1dcb0-b763-4570-a81a-c91f3b700441",
+      "name": "capture",
+      "webhookId": "8b991a68-451b-4993-a87d-82ea0511d9b5",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ZJRW8Dhw5zuRXRjp",
+          "mode": "list",
+          "cachedResultName": "persibonbom_pending_actions",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/ZJRW8Dhw5zuRXRjp"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Esta en espera?').item.json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "manual_caption_received"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "proposal_message_id",
+              "displayName": "proposal_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        624
+      ],
+      "id": "dd4132b7-86ef-4635-9975-31d9ae85c7e2",
+      "name": "actualiza estado"
+    },
+    {
+      "parameters": {
+        "content": "# Preparacion de fotos y mensaje",
+        "height": 576,
+        "width": 2022,
+        "color": "#518D49"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -768,
+        -624
+      ],
+      "typeVersion": 1,
+      "id": "1a12cd9a-1a33-49de-b97a-6732f840105d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# Lectura de mensaejes",
+        "height": 752,
+        "width": 1590,
+        "color": "#426D76"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -752,
+        16
+      ],
+      "typeVersion": 1,
+      "id": "5e60d7ef-300e-4d9c-a4e5-58c6d5fad875",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ZJRW8Dhw5zuRXRjp",
+          "mode": "list",
+          "cachedResultName": "persibonbom_pending_actions",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/ZJRW8Dhw5zuRXRjp"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "waiting_manual_caption"
+            },
+            {
+              "keyName": "chat_id",
+              "keyValue": "={{ $('Trigger').item.json.callback_query.message.chat.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        368
+      ],
+      "id": "49d1c5bb-6e6d-4653-877c-da42aefcfa7b",
+      "name": "Habia abiertas?",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ZJRW8Dhw5zuRXRjp",
+          "mode": "list",
+          "cachedResultName": "persibonbom_pending_actions",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/ZJRW8Dhw5zuRXRjp"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "waiting_manual_caption"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "superseded"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "proposal_message_id",
+              "displayName": "proposal_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        224
+      ],
+      "id": "559040cc-56d2-40e1-9f8b-029cc6ac151e",
+      "name": "cancela abierta"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        -400
+      ],
+      "id": "5c71c79d-f851-4a11-aef1-aefe29f33c58",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "zusWV5roG8HMXohf",
+          "mode": "list",
+          "cachedResultName": "instagram_pending_posts",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/zusWV5roG8HMXohf"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "proposal_message_id",
+              "keyValue": "={{ $('Esta en espera?').item.json.proposal_message_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "proposal_message_id": "={{ $json.result.message_id }}",
+            "caption": "={{ $('Trigger').item.json.message.text }}",
+            "status": "pending"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "proposal_message_id",
+              "displayName": "proposal_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_urls",
+              "displayName": "image_urls",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "instagram_media_id",
+              "displayName": "instagram_media_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        544
+      ],
+      "id": "c8a6fd53-41e2-4ba5-b23c-425ec1b93063",
+      "name": "Actualiza publish"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "zusWV5roG8HMXohf",
+          "mode": "list",
+          "cachedResultName": "instagram_pending_posts",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/zusWV5roG8HMXohf"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "proposal_message_id",
+              "keyValue": "={{$('Trigger').first().json.callback_query.message.message_id}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        48
+      ],
+      "id": "38fc03a2-e94a-4e05-ae45-cb31583ab846",
+      "name": "get publish"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/v26.0/17841479952509079/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.image_url }}"
+            },
+            {
+              "name": "is_carousel_item",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        48
+      ],
+      "id": "586e47ad-aed2-4951-bea7-bc34b20ee4c5",
+      "name": "ig media",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "NZmzFnFvlnPM3MTx",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn [{\n  json: {\n    children: items.map(i => String(i.json.id)).join(','),\n    caption: items[0].json.caption,\n    proposal_id: items[0].json.proposal_id,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        48
+      ],
+      "id": "3dd2a41d-b114-49e6-b2c0-ffd73de3951a",
+      "name": "prepara carrusel"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/v26.0/17841479952509079/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "media_type",
+              "value": "CAROUSEL"
+            },
+            {
+              "name": "children",
+              "value": "={{ $json.children }}"
+            },
+            {
+              "name": "=caption",
+              "value": "={{ $('prepara carrusel1').item.json.caption }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1392,
+        48
+      ],
+      "id": "5f25ce82-7a91-4b81-8e21-05ffc8015d99",
+      "name": "carrusel",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "NZmzFnFvlnPM3MTx",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.instagram.com/v26.0/17841479952509079/media_publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1536,
+        48
+      ],
+      "id": "51bd1f20-a240-426e-9378-0804ba6bc99f",
+      "name": "Publish",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "NZmzFnFvlnPM3MTx",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const urls = typeof $json.image_urls === 'string'\n  ? JSON.parse($json.image_urls)\n  : $json.image_urls;\n\nif (!Array.isArray(urls) || urls.length < 2 || urls.length > 10) {\n  throw new Error('Un carrusel de Instagram debe tener entre 2 y 10 fotos.');\n}\n\nreturn urls.map((image_url) => ({\n  json: {\n    image_url,\n    caption: $json.caption,\n    proposal_id: $json.id,\n  },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        48
+      ],
+      "id": "5ec8e8d7-2097-4542-b946-01abc3af0a2b",
+      "name": "prepara carrusel1"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "persibombon",
+        "fileName": "={{ 'instagram/' + $('buscar fotos').item.json.id + '.jpg' }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        944,
+        592
+      ],
+      "id": "5de3fbc3-ea8a-46c9-8d1c-1a9f4a6256af",
+      "name": "Upload a file",
+      "credentials": {
+        "s3": {
+          "id": "UQ98xXXidkQk1KDb",
+          "name": "S3 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "resize",
+        "width": 1080,
+        "height": 1350,
+        "resizeOption": "minimumArea",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -224
+      ],
+      "id": "008caaec-00f1-4254-8623-7ef7fa3f8b8c",
+      "name": "resize IG"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "zusWV5roG8HMXohf",
+          "mode": "list",
+          "cachedResultName": "instagram_pending_posts",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/zusWV5roG8HMXohf"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "pending",
+            "caption": "={{ $('Obtiene publish').item.json.caption }}",
+            "image_urls": "={{ JSON.stringify($('buscar fotos').all().map(i => 'https://pub-2cd8e6611f8740ee912a957e50a0f871.r2.dev/instagram/' + i.json.id + '.jpg')) }}",
+            "proposal_message_id": "={{ $json.result.message_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "proposal_message_id",
+              "displayName": "proposal_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_urls",
+              "displayName": "image_urls",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "instagram_media_id",
+              "displayName": "instagram_media_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1152,
+        592
+      ],
+      "id": "f9377fed-62e0-4cb2-80ef-3662262c3455",
+      "name": "nueva publish R2"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "zusWV5roG8HMXohf",
+          "mode": "list",
+          "cachedResultName": "instagram_pending_posts",
+          "cachedResultUrl": "/projects/zwNwAy3qq7U9PkdG/datatables/zusWV5roG8HMXohf"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "pending",
+            "caption": "={{ $('Obtiene publish').item.json.caption }}",
+            "image_urls": "={{ JSON.stringify(\n  $('Upload publish file').all().map(\n    i => 'https://lh3.googleusercontent.com/d/' + i.json.id + '=w1080-h1350'\n  )\n) }}",
+            "proposal_message_id": "={{ $json.result.message_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "proposal_message_id",
+              "displayName": "proposal_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "image_urls",
+              "displayName": "image_urls",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "instagram_media_id",
+              "displayName": "instagram_media_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1056,
+        -240
+      ],
+      "id": "7bb8b354-d91e-4648-83ac-b8c03c7396cd",
+      "name": "nueva publish Google"
+    },
+    {
+      "parameters": {
+        "content": "## Usa R2 como alternativa a google",
+        "height": 256,
+        "width": 384,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        912,
+        496
+      ],
+      "typeVersion": 1,
+      "id": "d3288eff-6176-480c-9f0f-60251a8c30f4",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        -224
+      ],
+      "id": "5a6a0671-81c6-4a3a-8e50-33b7574f0352",
+      "name": "Share IG",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u464uGFlhEWLQSzI",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "resize",
+        "width": "={{ Math.round($json.size.width * Math.min(1024 / $json.size.width, 1024 / $json.size.height, 1)) }}",
+        "height": "={{ Math.round($json.size.height * Math.min(1024 / $json.size.width, 1024 / $json.size.height, 1)) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        128,
+        -432
+      ],
+      "id": "54427afc-3005-44d8-a0b6-483cb50c2e2b",
+      "name": "Resize IA"
+    },
+    {
+      "parameters": {
+        "name": "={{ 'instagram-' + $json.id + '.jpg' }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1u-v_6X-gdBwyzYgpCOF4In5xoZnEJKWW",
+          "mode": "list",
+          "cachedResultName": "publish",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1u-v_6X-gdBwyzYgpCOF4In5xoZnEJKWW"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        304,
+        -224
+      ],
+      "id": "d2ed32be-d23f-4952-b2c2-84316cb90b3f",
+      "name": "Upload publish file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "u464uGFlhEWLQSzI",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        736,
+        -240
+      ],
+      "id": "66ebf8bb-8fe1-4ed7-8f17-53b5034e97b9",
+      "name": "Merge",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "crop",
+        "width": 1080,
+        "height": 1350,
+        "positionY": 526,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        128,
+        -224
+      ],
+      "id": "ef70f3d8-c6a9-423c-8cb3-c329fa067a54",
+      "name": "Crop Img"
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        48
+      ],
+      "id": "7e8d9c26-aef1-4cdc-aad6-5b92b1281d68",
+      "name": "Wait",
+      "webhookId": "f7f8c766-acbb-44f5-a1ac-f430ffc0142b"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1104,
+        48
+      ],
+      "id": "28a2a0a6-de95-4b75-bc1e-cd52efdbd6cd",
+      "name": "Wait1",
+      "webhookId": "85cf3acb-ed97-44fc-b3c6-bf82bfb76bda"
+    },
+    {
+      "parameters": {
+        "content": "# publicacion",
+        "height": 272,
+        "width": 1046,
+        "color": "#BBBD61"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        880,
+        -16
+      ],
+      "typeVersion": 1,
+      "id": "50138861-7673-44f5-b681-59308a03287b",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ac5d836c-141c-44c5-8cd5-cdf0ae3255f9",
+                    "leftValue": "={{ $json.callback_query }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "23b994a7-eadc-499b-8aaa-d8285b472879"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -496,
+        224
+      ],
+      "id": "435ffa06-c6b8-4514-9e9c-5d4e1f3c90d3",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -704,
+        224
+      ],
+      "id": "e1ae8e03-2dfc-4652-8d7e-c5622d4de220",
+      "name": "Trigger",
+      "webhookId": "aed63447-ed11-45a4-bcb4-cfca266c3b2a",
+      "credentials": {
+        "telegramApi": {
+          "id": "i4815tffPxl5Soh9",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Semanal": {
+      "main": [
+        [
+          {
+            "node": "buscar fotos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar fotos": {
+      "main": [
+        [
+          {
+            "node": "Descargar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar": {
+      "main": [
+        [
+          {
+            "node": "INFO fotos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "resize IG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "INFO fotos": {
+      "main": [
+        [
+          {
+            "node": "Resize IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara data foto": {
+      "main": [
+        [
+          {
+            "node": "IA pra Pubish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia fotos": {
+      "main": [
+        []
+      ]
+    },
+    "IA pra Pubish": {
+      "main": [
+        [
+          {
+            "node": "Obtiene publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtiene publish": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aceptada": {
+      "main": [
+        [
+          {
+            "node": "Aceptar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rechazar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Manual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual": {
+      "main": [
+        [
+          {
+            "node": "Habia abiertas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aceptar": {
+      "main": [
+        [
+          {
+            "node": "get publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "En espera": {
+      "main": [
+        [
+          {
+            "node": "publish manual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esta en espera?": {
+      "main": [
+        [
+          {
+            "node": "capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "cancela abierta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "En espera",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "capture": {
+      "main": [
+        [
+          {
+            "node": "actualiza estado",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Actualiza publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Habia abiertas?": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rechazar": {
+      "main": [
+        []
+      ]
+    },
+    "cancela abierta": {
+      "main": [
+        [
+          {
+            "node": "En espera",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia porpuesta": {
+      "main": [
+        [
+          {
+            "node": "nueva publish Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "buscar fotos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get publish": {
+      "main": [
+        [
+          {
+            "node": "prepara carrusel1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ig media": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepara carrusel": {
+      "main": [
+        [
+          {
+            "node": "carrusel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "carrusel": {
+      "main": [
+        [
+          {
+            "node": "Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepara carrusel1": {
+      "main": [
+        [
+          {
+            "node": "ig media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "resize IG": {
+      "main": [
+        [
+          {
+            "node": "Crop Img",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share IG": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Resize IA": {
+      "main": [
+        [
+          {
+            "node": "Envia fotos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepara data foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload publish file": {
+      "main": [
+        [
+          {
+            "node": "Share IG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Envia porpuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crop Img": {
+      "main": [
+        [
+          {
+            "node": "Upload publish file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "prepara carrusel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Aceptada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Esta en espera?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0fd9d4f6-c149-4e71-9f8a-b060437f2026",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "84216be52fa5044abef777f5a55dcffed51f664923bed9f771f8dec4bd36d767"
+  },
+  "nodeGroups": [],
+  "id": "5axktjZeJ9O0KkB6",
+  "tags": []
+}
